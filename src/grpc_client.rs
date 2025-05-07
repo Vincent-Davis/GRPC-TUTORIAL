@@ -7,22 +7,29 @@ use services::payment_service_client::PaymentServiceClient;
 use services::PaymentRequest;
 use tonic::Request;
 
+use services::{transaction_service_client::TransactionServiceClient, TransactionRequest};
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 2. Connect to our local server
     let mut client = PaymentServiceClient::connect("http://[::1]:50051").await?;
-
-    // 2. Create the gRPC request wrapper with our payload
-    let request = Request::new(PaymentRequest {
-        user_id: "user-123".to_string(),
+    let request = tonic::Request::new(PaymentRequest {
+        user_id: "user_123".to_string(),
         amount: 100.0,
     });
 
-    // 3. Send it and await the response
     let response = client.process_payment(request).await?;
-
-    // 4. Unwrap and print the inner message
     println!("RESPONSE={:?}", response.into_inner());
+
+    let mut transaction_client = TransactionServiceClient::connect("http://[::1]:50051").await?;
+    let request = tonic::Request::new(TransactionRequest {
+        user_id: "user_123".to_string(),
+    });
+
+    let mut stream = transaction_client.get_transaction_history(request).await?.into_inner();
+    while let Some(transaction) = stream.message().await? {
+        println!("Transaction: {:?}", transaction);
+    }
 
     Ok(())
 }
